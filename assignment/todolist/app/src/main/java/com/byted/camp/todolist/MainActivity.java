@@ -1,7 +1,10 @@
 package com.byted.camp.todolist;
 
 import android.app.Activity;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
@@ -15,11 +18,16 @@ import android.view.MenuItem;
 import android.view.View;
 
 import com.byted.camp.todolist.beans.Note;
+import com.byted.camp.todolist.beans.State;
+import com.byted.camp.todolist.db.TodoContract;
+import com.byted.camp.todolist.db.TodoDbHelper;
 import com.byted.camp.todolist.operation.activity.DatabaseActivity;
 import com.byted.camp.todolist.operation.activity.DebugActivity;
 import com.byted.camp.todolist.operation.activity.SettingActivity;
 import com.byted.camp.todolist.ui.NoteListAdapter;
 
+import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -28,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
 
     private RecyclerView recyclerView;
     private NoteListAdapter notesAdapter;
+    private TodoDbHelper dbHelper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -109,15 +118,62 @@ public class MainActivity extends AppCompatActivity {
 
     private List<Note> loadNotesFromDatabase() {
         // TODO 从数据库中查询数据，并转换成 JavaBeans
-        return null;
+
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        LinkedList<Note> linkedList = new LinkedList<>();
+
+        if(db == null) {
+            return linkedList;
+        }
+
+        Cursor cursor = db.query(
+                TodoContract.TodoNote.TABLE_NAME,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        while (cursor.moveToNext()) {
+            long itemId = cursor.getLong(cursor.getColumnIndexOrThrow(TodoContract.TodoNote._ID));
+            Note newNote = new Note(itemId);
+            newNote.setContent(cursor.getString(cursor.getColumnIndex(TodoContract.TodoNote.COLUMN_CONTENT)));
+            newNote.setDate(new Date(cursor.getLong(cursor.getColumnIndex(TodoContract.TodoNote.COLUMN_DATE))));
+            newNote.setState(State.from(cursor.getInt(cursor.getColumnIndex(TodoContract.TodoNote.COLUMN_STATE))));
+            linkedList.add(newNote);
+        }
+
+        db.close();
+        return linkedList;
     }
 
     private void deleteNote(Note note) {
         // TODO 删除数据
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+
+        if (db != null && db.delete(TodoContract.TodoNote.TABLE_NAME,
+                TodoContract.TodoNote._ID + "=?",
+                new String[] {String.valueOf(note.id)}) > 0) {
+            this.notesAdapter.refresh(loadNotesFromDatabase());
+            db.close();
+        }
     }
 
     private void updateNode(Note note) {
         // 更新数据
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        if (db != null) {
+            ContentValues values = new ContentValues();
+            values.put(TodoContract.TodoNote.COLUMN_STATE, note.getState().intValue);
+            if (db.update(TodoContract.TodoNote.TABLE_NAME,
+                    values,
+                    TodoContract.TodoNote._ID + "=?",
+                    new String[] {String.valueOf(note.id)}) > 0) {
+                notesAdapter.refresh(loadNotesFromDatabase());
+            }
+            db.close();
+        }
     }
-
 }

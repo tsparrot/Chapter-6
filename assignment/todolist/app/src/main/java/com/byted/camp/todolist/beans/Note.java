@@ -41,4 +41,12 @@ public class Note {
     public void setContent(String content) {
         this.content = content;
     }
+
+    /*public Priority getPriority() {
+        return priority;
+    }
+
+    public void setPriority(Priority priority) {
+        this.priority = priority;
+    }*/
 }
